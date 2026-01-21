@@ -54,8 +54,8 @@ export default function Home() {
 
     // 同时启动两个模型的流式响应（并发）
     await Promise.all([
-      gptStream.startStream(input),
-      geminiStream.startStream(input),
+      gptStream.startStream(input, 'gpt'),
+      geminiStream.startStream(input, 'gemini'),
     ])
   }
 
@@ -134,7 +134,7 @@ export default function Home() {
           <CardHeader className="border-b bg-blue-50/50 dark:bg-blue-950/20">
             <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
               <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-              Gemini 3 Pro
+              Gemini 3 Flash
             </CardTitle>
           </CardHeader>
           <div

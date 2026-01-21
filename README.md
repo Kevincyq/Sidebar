@@ -20,7 +20,7 @@
 ### 核心功能
 - 单个输入框（固定在底部）
 - 同时启动两个模型的流式响应（并发请求）
-- 模拟流式传输（使用 setInterval 模拟打字效果）
+- 真实的流式传输（通过 Turing 平台 API）
 - 支持"停止生成"功能
 - 系统级 API Keys 配置（通过环境变量，安全可靠）
 - Markdown 渲染：支持代码高亮，代码块自动横向滚动
@@ -93,22 +93,25 @@ npm start
 
 ## 配置 API Keys
 
-API Keys 通过环境变量配置，确保安全性：
+使用 Turing 平台的封装接口，API Keys 通过环境变量配置，确保安全性：
 
 1. 复制环境变量示例文件：
    ```bash
    cp .env.example .env.local
    ```
 
-2. 编辑 `.env.local` 文件，填入你的 API Keys：
+2. 编辑 `.env.local` 文件，填入你的 Turing API 配置：
    ```env
-   GPT_API_KEY=sk-your-gpt-api-key-here
-   GEMINI_API_KEY=your-gemini-api-key-here
+   TURING_API_KEY=your-turing-api-key-here
+   TURING_API_BASE=https://live-turing.cn.llm.tcljd.com/api/v1
    ```
 
 3. 重启开发服务器使配置生效
 
-**注意**：`.env.local` 文件已被 `.gitignore` 忽略，不会提交到代码仓库。
+**注意**：
+- `.env.local` 文件已被 `.gitignore` 忽略，不会提交到代码仓库
+- Turing 平台统一管理 GPT 和 Gemini 等模型的调用，使用统一的 API Key
+- 模型名称格式：`turing/gpt-4o-mini`、`turing/gemini-pro` 等
 
 ## 使用说明
 
@@ -120,37 +123,24 @@ API Keys 通过环境变量配置，确保安全性：
 2. **停止生成**:
    - 在生成过程中，点击停止按钮可以中断流式传输
 
-## 自定义流式传输
+## API 调用说明
 
-当前使用模拟的流式传输（`hooks/use-stream.ts`）。要替换为真实的 API 调用：
+项目使用 Turing 平台的封装接口来调用 GPT 和 Gemini 模型：
 
-1. 打开 `hooks/use-stream.ts`
-2. 修改 `mockStreamResponse` 函数或创建新的函数
-3. 使用 `fetch` API 处理 SSE 流：
+- **API 路由**: `app/api/chat/route.ts` - 处理流式 API 调用
+- **前端 Hook**: `hooks/use-stream.ts` - 处理流式响应解析
+- **模型配置**: 
+  - GPT 模型：`turing/gpt-4o-mini`（可在 `app/api/chat/route.ts` 中修改）
+  - Gemini 模型：`turing/gemini-pro`（可在 `app/api/chat/route.ts` 中修改）
 
-```typescript
-const response = await fetch('/api/stream', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ prompt }),
-})
-
-const reader = response.body?.getReader()
-const decoder = new TextDecoder()
-
-while (true) {
-  const { done, value } = await reader.read()
-  if (done) break
-  const chunk = decoder.decode(value)
-  // 处理 chunk...
-}
-```
+如需修改模型，编辑 `app/api/chat/route.ts` 中的 `turingModel` 变量。
 
 ## 注意事项
 
 - API Keys 通过环境变量配置，存储在服务器端，不会暴露给客户端
-- 当前使用模拟流式传输，需要替换为真实的 API 端点
+- 使用 Turing 平台的统一接口，支持 GPT 和 Gemini 等多种模型
 - 确保 `.env.local` 文件已添加到 `.gitignore`，不要提交到代码仓库
+- 流式响应通过 Server-Sent Events (SSE) 实现，支持实时显示生成内容
 
 ## PWA 图标
 

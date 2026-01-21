@@ -10,15 +10,14 @@ export interface UseStreamReturn {
   content: string
   isStreaming: boolean
   error: string | null
-  startStream: (prompt: string) => Promise<void>
+  startStream: (prompt: string, model: 'gpt' | 'gemini') => Promise<void>
   stopStream: () => void
   reset: () => void
 }
 
 /**
- * 模拟流式响应的自定义Hook
- * 使用setInterval模拟打字效果
- * 后续可以轻松替换为真实的fetch SSE调用
+ * 流式响应的自定义Hook
+ * 使用 Turing 平台的流式 API
  */
 export function useStream(): UseStreamReturn {
   const [state, setState] = useState<StreamState>({
@@ -27,31 +26,13 @@ export function useStream(): UseStreamReturn {
     error: null,
   })
 
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  /**
-   * 模拟流式响应生成
-   * 实际使用时，这里应该替换为真实的fetch SSE调用
-   */
-  const mockStreamResponse = useCallback(
-    async (prompt: string): Promise<string> => {
-      // 模拟API响应延迟
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      // 模拟的完整响应文本
-      const mockResponse = `这是对"${prompt}"的模拟回答。\n\n在实际应用中，这里会通过Server-Sent Events (SSE)从后端API接收流式数据。\n\n你可以轻松地将此函数替换为真实的fetch调用，例如：\n\n\`\`\`typescript\nconst response = await fetch('/api/stream', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({ prompt }),\n})\n\nconst reader = response.body?.getReader()\nconst decoder = new TextDecoder()\n\nwhile (true) {\n  const { done, value } = await reader.read()\n  if (done) break\n  const chunk = decoder.decode(value)\n  // 处理chunk...\n}\n\`\`\``
-
-      return mockResponse
-    },
-    []
-  )
-
   const startStream = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, model: 'gpt' | 'gemini') => {
       // 如果已经在流式传输，先停止
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
       }
 
       // 创建新的AbortController
@@ -64,45 +45,75 @@ export function useStream(): UseStreamReturn {
       })
 
       try {
-        // 获取完整响应（模拟）
-        const fullResponse = await mockStreamResponse(prompt)
+        // 调用后端 API 获取流式响应
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ prompt, model }),
+          signal: abortControllerRef.current.signal,
+        })
 
-        // 检查是否已中止
-        if (abortControllerRef.current?.signal.aborted) {
-          return
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
         }
 
-        // 模拟逐字符流式输出
-        let currentIndex = 0
-        const characters = fullResponse.split("")
+        // 处理流式响应
+        const reader = response.body?.getReader()
+        const decoder = new TextDecoder()
 
-        intervalRef.current = setInterval(() => {
+        if (!reader) {
+          throw new Error('No response body')
+        }
+
+        while (true) {
+          // 检查是否已中止
           if (abortControllerRef.current?.signal.aborted) {
-            if (intervalRef.current) {
-              clearInterval(intervalRef.current)
-              intervalRef.current = null
-            }
+            reader.cancel()
             return
           }
 
-          if (currentIndex < characters.length) {
-            setState((prev) => ({
-              ...prev,
-              content: prev.content + characters[currentIndex],
-            }))
-            currentIndex++
-          } else {
-            // 流式传输完成
-            if (intervalRef.current) {
-              clearInterval(intervalRef.current)
-              intervalRef.current = null
-            }
+          const { done, value } = await reader.read()
+
+          if (done) {
             setState((prev) => ({
               ...prev,
               isStreaming: false,
             }))
+            break
           }
-        }, 20) // 每20ms输出一个字符，模拟打字效果
+
+          // 解析 SSE 数据
+          const chunk = decoder.decode(value, { stream: true })
+          const lines = chunk.split('\n')
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6)
+              if (data === '[DONE]') {
+                setState((prev) => ({
+                  ...prev,
+                  isStreaming: false,
+                }))
+                return
+              }
+
+              try {
+                const json = JSON.parse(data)
+                if (json.content) {
+                  setState((prev) => ({
+                    ...prev,
+                    content: prev.content + json.content,
+                  }))
+                }
+              } catch (e) {
+                // 忽略解析错误
+              }
+            }
+          }
+        }
       } catch (error) {
         if (!abortControllerRef.current?.signal.aborted) {
           setState({
@@ -113,7 +124,7 @@ export function useStream(): UseStreamReturn {
         }
       }
     },
-    [mockStreamResponse]
+    []
   )
 
   const stopStream = useCallback(() => {
