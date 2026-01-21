@@ -1,0 +1,170 @@
+# AI Model Arena
+
+一个响应式的 Web 前端应用（PWA），允许用户输入一个问题并同时从两个不同的 AI 模型（GPT-5.2 和 Gemini 3 Pro）接收流式回答进行对比。
+
+## 技术栈
+
+- **框架**: Next.js 14+ (App Router) with TypeScript
+- **样式**: Tailwind CSS + Shadcn UI
+- **图标**: Lucide React
+- **Markdown**: react-markdown + react-syntax-highlighter
+- **状态管理**: React Hooks (useState, useEffect, useRef)
+- **网络**: 原生 fetch API（支持 SSE）
+
+## 功能特性
+
+### 布局
+- **上下堆叠布局**: 适合在浏览器侧边栏中运行（GPT在上，Gemini在下，各占50%高度）
+- **安全区域**: 处理移动设备的"刘海"和底部主屏幕栏
+
+### 核心功能
+- 单个输入框（固定在底部）
+- 同时启动两个模型的流式响应（并发请求）
+- 模拟流式传输（使用 setInterval 模拟打字效果）
+- 支持"停止生成"功能
+- 系统级 API Keys 配置（通过环境变量，安全可靠）
+- Markdown 渲染：支持代码高亮，代码块自动横向滚动
+- 自动滚动：文本生成时自动滚动到底部
+- 视觉区分：每个模型使用不同的颜色主题（绿色代表 GPT，蓝色代表 Gemini）
+
+### PWA 支持
+- 可安装到移动设备和桌面
+- 支持离线使用（基础功能）
+
+## 项目结构
+
+```
+.
+├── app/
+│   ├── layout.tsx          # 全局布局（viewport、安全区域）
+│   ├── page.tsx            # 主聊天界面逻辑和布局
+│   └── globals.css         # 全局样式
+├── components/
+│   ├── chat-message.tsx   # Markdown 内容渲染组件
+│   └── ui/                 # Shadcn UI 组件
+│       ├── button.tsx
+│       ├── input.tsx
+│       ├── card.tsx
+│       └── dialog.tsx
+├── hooks/
+│   └── use-stream.ts       # 流式处理自定义 Hook
+├── lib/
+│   └── utils.ts            # 工具函数
+└── public/
+    └── manifest.json       # PWA 配置文件
+```
+
+## 安装和运行
+
+### 1. 安装依赖
+
+```bash
+npm install
+```
+
+### 2. 开发模式
+
+```bash
+npm run dev
+```
+
+应用将在 [http://localhost:3000](http://localhost:3000) 启动。
+
+**WSL 环境访问说明**：
+- 开发服务器已配置为监听所有网络接口（`0.0.0.0`）
+- 从 Windows 浏览器访问：`http://<WSL_IP>:3000`
+- 获取 WSL IP 地址：在 WSL 中运行 `hostname -I`
+- 当前 WSL IP：`172.19.181.182`（可能会变化）
+- 也可以尝试使用 `localhost:3000`（如果 Windows 端口转发已配置）
+
+### 3. 构建生产版本
+
+```bash
+npm run build
+npm start
+```
+
+## 部署到 Vercel
+
+1. 将代码推送到 GitHub
+2. 在 [Vercel](https://vercel.com) 导入项目
+3. Vercel 会自动检测 Next.js 项目并配置构建设置
+4. 部署完成！
+
+## 配置 API Keys
+
+API Keys 通过环境变量配置，确保安全性：
+
+1. 复制环境变量示例文件：
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. 编辑 `.env.local` 文件，填入你的 API Keys：
+   ```env
+   GPT_API_KEY=sk-your-gpt-api-key-here
+   GEMINI_API_KEY=your-gemini-api-key-here
+   ```
+
+3. 重启开发服务器使配置生效
+
+**注意**：`.env.local` 文件已被 `.gitignore` 忽略，不会提交到代码仓库。
+
+## 使用说明
+
+1. **提问**:
+   - 在底部输入框输入您的问题
+   - 按 Enter 或点击发送按钮
+   - 两个模型将同时开始生成回答（上下堆叠显示）
+
+2. **停止生成**:
+   - 在生成过程中，点击停止按钮可以中断流式传输
+
+## 自定义流式传输
+
+当前使用模拟的流式传输（`hooks/use-stream.ts`）。要替换为真实的 API 调用：
+
+1. 打开 `hooks/use-stream.ts`
+2. 修改 `mockStreamResponse` 函数或创建新的函数
+3. 使用 `fetch` API 处理 SSE 流：
+
+```typescript
+const response = await fetch('/api/stream', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ prompt }),
+})
+
+const reader = response.body?.getReader()
+const decoder = new TextDecoder()
+
+while (true) {
+  const { done, value } = await reader.read()
+  if (done) break
+  const chunk = decoder.decode(value)
+  // 处理 chunk...
+}
+```
+
+## 注意事项
+
+- API Keys 通过环境变量配置，存储在服务器端，不会暴露给客户端
+- 当前使用模拟流式传输，需要替换为真实的 API 端点
+- 确保 `.env.local` 文件已添加到 `.gitignore`，不要提交到代码仓库
+
+## PWA 图标
+
+项目已包含 PWA 图标文件（icon-192.png, icon-512.png）。如果需要重新生成图标：
+
+```bash
+npm run generate-icons
+```
+
+或者使用浏览器工具：
+1. 打开 `public/generate-icons.html` 文件
+2. 点击按钮下载对应尺寸的图标
+
+## 许可证
+
+MIT
+
