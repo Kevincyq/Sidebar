@@ -128,11 +128,6 @@ export function useStream(): UseStreamReturn {
   )
 
   const stopStream = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
-
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null

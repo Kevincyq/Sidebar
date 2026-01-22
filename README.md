@@ -86,10 +86,15 @@ npm start
 
 ## 部署到 Vercel
 
+详细的部署步骤请参考 [VERCEL_DEPLOY.md](./VERCEL_DEPLOY.md)
+
+快速步骤：
 1. 将代码推送到 GitHub
-2. 在 [Vercel](https://vercel.com) 导入项目
-3. Vercel 会自动检测 Next.js 项目并配置构建设置
-4. 部署完成！
+2. 在 [Vercel](https://vercel.com) 导入项目（使用 GitHub 登录）
+3. 配置环境变量：`TURING_API_KEY` 和 `TURING_API_BASE`
+4. 点击部署，完成！
+
+**重要**：记得在 Vercel 项目设置中配置环境变量，否则 API 调用会失败。
 
 ## 配置 API Keys
 
